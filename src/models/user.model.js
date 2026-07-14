@@ -53,7 +53,7 @@ const userSchema = new Schema(
 userSchema.pre('save', async function () {
     if (!this.isModified('password')) return ;
     this.password = await bcrypt.hash(this.password, 10);
-    // next();
+    // next(); removed it because newer version of mongoose does not require next if the function is async
 });
 
 userSchema.methods.isPasswordCorrect = async function (password) {
