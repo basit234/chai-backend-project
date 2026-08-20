@@ -111,7 +111,7 @@ const registerUser = asyncHandler(async (req, res) => {
     return res
         .status(201)
         .json(
-            new ApiResponse(200, 'User registered successfully', createdUser)
+            new ApiResponse(201, createdUser, 'User registered successfully')
         );
 });
 
@@ -192,7 +192,10 @@ const logoutUser = asyncHandler(async (req, res) => {
     await User.findOneAndUpdate(
         req.user._id, 
         {
-            refreshToken: undefined
+            // refreshToken: undefined
+            $unset : {
+                refreshToken : 1
+            }
         },
         {
             new: true
@@ -267,12 +270,12 @@ const changeCurrentPassword = asyncHandler(async (req, res) => {
 
     return res
     .status(200)
-    .json(new ApiResponse(200, {}, 'Password changed successfully'));   
+    .json(new ApiResponse(200, {}, 'Password changed successfully')); 
 
 });
 
 const getCurrentUser = asyncHandler(async (req, res) => {
-    return res.status(200).json(new ApiResponse(200, req.user, "User details fetched successfully"));
+    return res.status(200).json(new ApiResponse(200, req.user, 'User details fetched successfully'));
 });
 
 const updateAccountDetails = asyncHandler(async (req, res) => {
@@ -295,7 +298,7 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
 
     return res
     .status(200)
-    .json(new ApiResponse(200, user, "Account details updated successfully"));
+    .json(new ApiResponse(200, user, 'Account details updated successfully'));
 });
 
 const updateUserAvatar = asyncHandler(async (req, res) => {
@@ -323,8 +326,25 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
 
     return res
     .status(200)
-    .json(new ApiResponse(200, user, "Avatar updated successfully"));
+    .json(new ApiResponse(200, user, 'Avatar updated successfully'));
 });
+
+const deleteUserAvatar = asyncHandler(async (req, res)=>{
+
+    const user = await User.findByIdAndUpdate(
+        req.user?._id, 
+        {
+            $unset : {
+                avatar : true
+            }
+        },
+        {new : true}
+    ).select('-password')
+
+    return res
+    .status(200)
+    .json(new ApiResponse(200, user, 'Avatar deleted successfully'));
+})
 
 const updateUserCoverImage = asyncHandler(async (req, res) => {
     const coverImageLocalPath = req?.file?.path;
@@ -351,8 +371,24 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
 
     return res
     .status(200)
-    .json(new ApiResponse(200, user, "Cover image updated successfully"));
+    .json(new ApiResponse(200, user, 'Cover image updated successfully'));
 });
+
+const deleteUserCoverImage = asyncHandler(async (req, res)=>{
+    const user = await User.findByIdAndUpdate(
+        req.user?._id,
+        {
+            $unset : {
+                coverImage : true
+            }
+        },
+        {new : true}
+    ).select('-password')
+
+    return res
+    .status(200)
+    .json(new ApiResponse(200, user, 'Cover image deleted successfully'));
+})
 
 const getUserChannelProfile = asyncHandler(async (req, res) => { 
     const {userName} = req.params
@@ -386,15 +422,15 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
         {
             $addFields : {
                 subscribersCount : { $size: '$subscribers' },
-                channelsSubscribedToCount : { $size: '$subscribedTo' }
-            },
-            isSubscribed : {
-                $cond: {
-                    if : {$in: [req.user?._id, '$subscribers.subscriber']},
-                    then : true,
-                    else : false
+                channelsSubscribedToCount : { $size: '$subscribedTo' },
+                isSubscribed : {
+                    $cond: {
+                        if : {$in: [req.user?._id, '$subscribers.subscriber']},
+                        then : true,
+                        else : false
+                    }
                 }
-            }
+            },
         },
         {
             $project : {
@@ -416,11 +452,11 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
 
     return res
     .status(200)
-    .json(new ApiResponse(200, channel[0], "Channel fetched successfully"))
+    .json(new ApiResponse(200, channel[0], 'Channel fetched successfully'))
 })
 
 const getWatchHistory = asyncHandler(async (req, res) => {
-    const user = User.aggregate([
+    const user = await User.aggregate([
         {
             $match : {
                 _id : new mongoose.Types.ObjectId(req.user?._id)
@@ -462,7 +498,7 @@ const getWatchHistory = asyncHandler(async (req, res) => {
 
     return res
     .status(200)
-    .json(new ApiResponse(200, user[0].watchHistory, "Watch history fetched successfully"))
+    .json(new ApiResponse(200, user[0].watchHistory, 'Watch history fetched successfully'))
 })
 
 export {
@@ -474,7 +510,9 @@ export {
     getCurrentUser,
     updateAccountDetails,
     updateUserAvatar,
+    deleteUserAvatar,
     updateUserCoverImage,
+    deleteUserCoverImage,
     getUserChannelProfile,
     getWatchHistory,
 };
