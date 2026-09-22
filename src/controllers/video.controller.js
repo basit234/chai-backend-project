@@ -11,6 +11,7 @@ const getAllVideos = asyncHandler(async(req, res)=>{
     // TODO: get all videos based on query, sort, pagination
 })
 
+// Create a Video
 const publishAVideo = asyncHandler(async(req, res)=>{
     const {title, description} = req.body
     // TODO: get video, upload to cloudinary, create video
@@ -58,6 +59,7 @@ const publishAVideo = asyncHandler(async(req, res)=>{
     .json(new ApiResponse(201, newVideo, 'Video published successfully'));
 })
 
+// get a single video
 const getVideoById = asyncHandler(async(req, res)=>{
     const {videoId} = req.params
     // TODO: get video by id
@@ -73,19 +75,115 @@ const getVideoById = asyncHandler(async(req, res)=>{
     .json(new ApiResponse(200, video, 'Video found successfully'));
 })
 
+// update a video
 const updateVideo = asyncHandler(async(req, res)=>{
     const {videoId} = req.params
      //TODO: update video details like title, description, thumbnail
+    const {title, description} = req.body
+    // console.log(title, description, videoFile, thumbnail, "aaaaaaaaa");
+    // console.log(req.files?.videoFile[0].path, "req")
+    let videoLocalPath = req?.files?.videoFile?.[0]?.path
+    let thumbnailLocalPath = req?.files?.thumbnail?.[0]?.path
+    if(videoLocalPath) {
+        // console.log(videoLocalPath, "updatedVideo");
+         videoLocalPath = await uploadOnCloudinary(videoLocalPath)
+    }
+    if(thumbnailLocalPath) {
+        // console.log(thumbnailLocalPath, "updatedThumbnail");
+         thumbnailLocalPath = await uploadOnCloudinary(thumbnailLocalPath)
+    }
+    const existingVideo = await Video.findById(videoId)
+    const existingVideoPath = existingVideo?.videoFile
+    const existingThumbnailPath = existingVideo?.thumbnail
+    const newVideo = videoLocalPath ? videoLocalPath.url : existingVideoPath
+    const newThumbnail = thumbnailLocalPath ? thumbnailLocalPath.url : existingThumbnailPath
+    const video = await Video.findByIdAndUpdate(videoId, {
+        title,
+        description,
+        videoFile : newVideo,
+        thumbnail : newThumbnail
+    }, {
+        new : true
+    })
+
+    return res
+    .status(200)
+    .json(new ApiResponse(200, video, 'Video updated successfully'));
 })
+
+
+// This is the optimized version for the updateVideo but for now I will stick to my own solution
+// const updateVideo = asyncHandler(async (req, res) => {
+//     const { videoId } = req.params
+//     const { title, description } = req.body
+
+//     let videoLocalPath = req?.files?.videoFile?.[0]?.path
+//     let thumbnailLocalPath = req?.files?.thumbnail?.[0]?.path
+
+//     if (videoLocalPath) {
+//         videoLocalPath = await uploadOnCloudinary(videoLocalPath)
+//     }
+
+//     if (thumbnailLocalPath) {
+//         thumbnailLocalPath = await uploadOnCloudinary(thumbnailLocalPath)
+//     }
+
+//     const updateData = {
+//         title,
+//         description
+//     }
+
+//     if (videoLocalPath) {
+//         updateData.videoFile = videoLocalPath.url
+//     }
+
+//     if (thumbnailLocalPath) {
+//         updateData.thumbnail = thumbnailLocalPath.url
+//     }
+
+//     const video = await Video.findByIdAndUpdate(
+//         videoId,
+//         updateData,
+//         {
+//             new: true
+//         }
+//     )
+
+//     return res
+//         .status(200)
+//         .json(new ApiResponse(200, video, 'Video updated successfully'))
+// })
 
 const deleteVideo = asyncHandler(async(req, res)=>{
     const {videoId} = req.params
     // TODO: delete video
+    const video = await Video.findByIdAndDelete(videoId)
+
+    if(!video) {
+        throw new ApiError(404, 'Video not found');
+    }
+    
+
+    return res
+    .status(200)
+    .json(new ApiResponse(200, video, 'Video deleted successfully'));
 })
 
 const togglePublishStatus = asyncHandler(async(req, res)=>{
     const {videoId} = req.params
     // TODO: toggle publish status
+    const video = await Video.findById(videoId)
+
+    if(!video) {
+        throw new ApiError(404, 'Video not found');
+    }
+
+    video.isPublished = !video.isPublished
+    await video.save()
+
+    return res
+    .status(200)
+    .json(new ApiResponse(200, video, 'Video published status toggled successfully'));
 })
 
 export {getAllVideos , publishAVideo, getVideoById, updateVideo, deleteVideo, togglePublishStatus}
