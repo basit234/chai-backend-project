@@ -16,8 +16,8 @@ router.route("/").get(getAllVideos).post(
             name : "thumbnail",
             maxCount : 1
         },
-        publishAVideo
-    ])
+    ]),
+    publishAVideo
 )
 
 router.route("/:videoId").get(getVideoById).delete(deleteVideo).patch(upload.single("thumbnail"), updateVideo) // the route will be same for the get , delete and update video but the method will tell what to do 
