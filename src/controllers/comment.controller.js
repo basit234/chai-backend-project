@@ -2,11 +2,67 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { Comment } from '../models/comment.model.js';
 import { ApiError } from '../utils/apiError.js';
 import { ApiResponse } from '../utils/apiResponse.js';
+import mongoose from 'mongoose';
 
 const getVideoComments = asyncHandler(async (req, res) => {
     //TODO: get all comments for a video
     const { videoId } = req.params;
     const { page = 1, limit = 10 } = req.query;
+
+    const total = await Comment.countDocuments({ video: videoId });
+
+    // simple way to get comments with owner details using populate
+    // const comments = await Comment.find({ video: videoId })
+    //     .populate('owner', 'userName email')
+    //     .skip((page - 1) * limit)
+    //     .limit(limit);
+    const comments = await Comment.aggregate([
+        { $match: { video: new mongoose.Types.ObjectId(videoId) } },
+        {
+            // Join with the users collection to get the owner details
+            $lookup: {
+                from: 'users',
+                localField: 'owner',
+                foreignField: '_id',
+                as: 'owner',
+            },
+        },
+        {
+            $unwind: '$owner', // Unwind the owner array to get individual owner documents and unwind is used to deconstruct the owner array field from the input documents to output a document for each element. If the owner array is empty, the comment will be excluded from the results.
+        },
+        {
+            // get only the required fields from the owner
+            $project: {
+                content: 1,
+                video: 1,
+                owner: {
+                    userName: 1,
+                    email: 1,
+                    avatar: 1,
+                },
+            },
+        },
+        {
+            // paginate the results
+            $skip: (page - 1) * limit,
+        },
+        {
+            // limit the results
+            $limit: Number(limit),
+        },
+    ]);
+    const pagination = {
+        total,
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(total / limit),
+    }
+    return res.status(200).json({
+        success: true,
+        message: 'Comments found successfully',
+        data: comments,
+        pagination
+    });
 });
 
 const addComment = asyncHandler(async (req, res) => {
@@ -34,7 +90,6 @@ const addComment = asyncHandler(async (req, res) => {
 
 const updateComment = asyncHandler(async (req, res) => {
     //TODO: update a comment to a video
-    console.log(req, 'request body');
     const { commentId } = req.params;
     const { content } = req?.body;
 
@@ -56,11 +111,9 @@ const updateComment = asyncHandler(async (req, res) => {
         { new: true }
     );
 
-    return res.status(200).json({
-        success: true,
-        message: 'Comment updated successfully',
-        data: comment,
-    });
+    return res
+        .status(200)
+        .json(new ApiResponse(200, comment, 'Comment updated successfully'));
 });
 
 const deleteComment = asyncHandler(async (req, res) => {
@@ -72,11 +125,9 @@ const deleteComment = asyncHandler(async (req, res) => {
     }
 
     const comment = await Comment.findByIdAndDelete(commentId);
-    return res.status(200).json({
-        success: true,
-        message: 'Comment deleted successfully',
-        data: comment,
-    });
+    return res
+        .status(200)
+        .json(new ApiResponse(200, comment, 'Comment deleted successfully'));
 });
 
 export { getVideoComments, addComment, updateComment, deleteComment };
